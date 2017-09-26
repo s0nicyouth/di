@@ -1,8 +1,6 @@
-#include "inject_markers.h"
-#include "type_info.h"
 #include <iostream>
 #include <typeinfo>
-#include "type_holder.h"
+#include "simple_di.h"
 
 class test {
 public:
@@ -12,9 +10,17 @@ public:
 class test_class {
 public:
 	INJECT(test_class, test* t, int* a) { std::cout << "Value of a is " << *a << std::endl;}
-	/*explicit test_class(int* b, int* a) {}
-	explicit test_class(int* b) {}*/
 	std::string test() {return "Works";}
+};
+class l2;
+class l1 {
+public:
+	INJECT(l1, l2* a) {};
+};
+
+class l2 {
+public:
+	INJECT(l2, l1* a) {};
 };
 
 class Parent {
@@ -27,6 +33,11 @@ public:
 	void test() override {std::cout << "Derived" << std::endl;}
 };
 
+class NotConstTest {
+public:
+	INJECT_EMPTY(NotConstTest) {};
+};
+
 int f(std::string a, int b) {return 0;};
 
 int main() {
@@ -36,9 +47,13 @@ int main() {
 	di::Register<test>();
 	di::Register<test_class>();
 	di::RegisterInterface<Parent, Derived>();
+	di::Register<l1>();
+	di::Register<l2>();
+	di::Register<NotConstTest>();
+	std::cout << "Resolving l1" << std::endl;
+	di::Resolve<l1>();
 	std::cout << di::Resolve<test_class>()->test() << std::endl;
 	di::Resolve<Parent>()->test();
-	//std::cout << IsConstructable<T, const DiMark&&, decltype(Any())>{} << std::endl;
-	//std::cout << di::ConstructIfPossible<test_class>()->test() << std::endl;
+	di::Resolve<NotConstTest>();
 	return 0;
 }
