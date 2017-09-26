@@ -26,8 +26,11 @@ public:
 
 int main() {
 	di::Injector i;
+	di::Injector j;
 	int ii = 17;
+	int jj = 27;
 	float ff = 17;
+	j.Register<int>(&jj);
 	i.RegisterInterface<Interface, Implementation>();
 	i.Register<test_dependant>();
 	i.Register<test_class>();
@@ -36,4 +39,5 @@ int main() {
 	std::cout << *i.Resolve<int>() << std::endl;
 	i.Resolve<Interface>()->test();
 	i.Resolve<test_dependant>()->test();
+	std::cout << *j.Resolve<int>() << std::endl;
 }

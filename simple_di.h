@@ -73,8 +73,8 @@ public:
 	}
 
 	template<typename I, typename T> void RegisterInterface(T* val = 0) {
-	DCHECK(registered_creators_.find(TypeId<I>) == registered_creators_.end(),
-		   "Can not register already registered type");
+		DCHECK(registered_creators_.find(TypeId<I>) == registered_creators_.end(),
+		   	   "Can not register already registered type");
 		auto creator = new LazyCreator<I>;
 		if (!val) {
 			creator->Register([this] { return static_cast<I*>(this->ConstructIfPossible<T>()); });
