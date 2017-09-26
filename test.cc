@@ -2,58 +2,38 @@
 #include <typeinfo>
 #include "simple_di.h"
 
-class test {
-public:
-	INJECT(test, int* a) {}
-};
-
 class test_class {
 public:
-	INJECT(test_class, test* t, int* a) { std::cout << "Value of a is " << *a << std::endl;}
-	std::string test() {return "Works";}
-};
-class l2;
-class l1 {
-public:
-	INJECT(l1, l2* a) {};
+	INJECT(test_class, std::shared_ptr<int> a, std::shared_ptr<float> b) {};
+	void test() {std::cout << "Called test_class" << std::endl;}
 };
 
-class l2 {
+class test_dependant {
 public:
-	INJECT(l2, l1* a) {};
+	INJECT(test_dependant, std::shared_ptr<test_class> t) {}
+	void test() {std::cout << "Called dependant" << std::endl;}
 };
 
-class Parent {
+class Interface {
 public:
-	virtual void test() {std::cout << "Parent" << std::endl; }
+	virtual void test() {std::cout << "Interface" << std::endl;}
 };
-class Derived : public Parent {
+class Implementation : public Interface {
 public:
-	INJECT(Derived, int* a) {};
-	void test() override {std::cout << "Derived" << std::endl;}
+	INJECT(Implementation, std::shared_ptr<test_dependant> t) {}
+	void test() override {std::cout << "Implementation" << std::endl;}
 };
-
-class NotConstTest {
-public:
-	INJECT_EMPTY(NotConstTest) {};
-};
-
-int f(std::string a, int b) {return 0;};
 
 int main() {
-	int* i = new int;
-	*i = 17;
-	di::Register<int>(i);
-	di::Register<test>();
-	di::Register<test_class>();
-	di::RegisterInterface<Parent, Derived>();
-	di::Register<l1>();
-	di::Register<l2>();
-	di::Register<NotConstTest>();
-	std::cout << "Resolving l1" << std::endl;
-	di::Resolve<l1>();
-	std::cout << di::Resolve<test_class>()->test() << std::endl;
-	di::Resolve<Parent>()->test();
-	di::Resolve<NotConstTest>();
-	return 0;
+	di::Injector i;
+	int ii = 17;
+	float ff = 17;
+	i.RegisterInterface<Interface, Implementation>();
+	i.Register<test_dependant>();
+	i.Register<test_class>();
+	i.Register<int>(&ii);
+	i.Register<float>(&ff);
+	std::cout << *i.Resolve<int>() << std::endl;
+	i.Resolve<Interface>()->test();
+	i.Resolve<test_dependant>()->test();
 }

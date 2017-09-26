@@ -1,6 +1,8 @@
 #include <utility>
 #include <type_traits>
 #include <functional>
+#include <unordered_map>
+#include <memory>
 
 #include "debug/debug.h"
 
@@ -15,59 +17,13 @@ namespace di {
 
 struct DiMark{};
 
-template<typename T>static T* ConstructIfPossible();
-
-template<typename I> struct LazyCreator {
-	static bool creation_in_progress;
-	static I* value;
-	static std::function<I*()> creator;
-	static void Register(std::function<I*()> f) {
-		creator = f;
-	}
-	static I* Resolve() {
-		DCHECK(!creation_in_progress, "Loop detected!");
-		creation_in_progress = true;
-		if (!value) {
-			value = creator();
-		}
-		creation_in_progress = false;
-		return value;
+template<typename C> struct AnyResolver {
+	C* injector_;
+	AnyResolver(C* injector) : injector_(injector) {}
+	template<typename T> operator std::shared_ptr<T>() {
+		return injector_->template Resolve<T>();
 	}
 };
-template<typename I> I* LazyCreator<I>::value = reinterpret_cast<I*>(0);
-template<typename I> bool LazyCreator<I>::creation_in_progress = false;
-template<typename I> std::function<I*()> LazyCreator<I>::creator = []() -> I* {
-	DCHECK(false, "Trying to resolve unregistered type");
-	return LazyCreator<I>::value;
-};
-
-template<typename T> void Register(T* val = 0) {
-	if (!val) {
-		LazyCreator<T>::Register([] { return ConstructIfPossible<T>(); });
-	} else {
-		LazyCreator<T>::Register([val] { return val; });
-	}
-}
-
-
-template<typename I, typename T> void RegisterInterface(T* val = 0) {
-	if (!val) {
-		LazyCreator<I>::Register([] { return static_cast<I*>(ConstructIfPossible<T>()); });
-	} else {
-		LazyCreator<I>::Register([val] { return static_cast<I*>(val); });
-	}
-}
-
-template<typename T> T* Resolve() {
-	return LazyCreator<T>::Resolve();
-}
-
-struct AnyResolver {
-	template<typename T> operator T() {
-		return Resolve<typename std::remove_pointer<T>::type>();
-	}
-};
-
 
 template<bool E, typename T, typename... Args> struct DiConstructor {
 	static T* construct(Args... args) {
@@ -81,112 +37,82 @@ template<typename T, typename... Args> struct DiConstructor<true, T, Args...> {
 	}
 };
 
-template<typename T> T* ConstructIfPossible() {
-	std::cout << typeid(T).name() << std::endl;
-	if (std::is_constructible<T, DiMark&&, decltype(AnyResolver())>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(AnyResolver())>{},
+template<typename I> struct LazyCreator {
+	bool creation_in_progress;
+	std::shared_ptr<I> value;
+	std::function<I*()> creator;
+	void Register(std::function<I*()> f) {
+		creator = f;
+	}
+	std::shared_ptr<I> Resolve() {
+		DCHECK(!creation_in_progress, "Loop detected!");
+		creation_in_progress = true;
+		if (!value.get()) {
+			value.reset(creator());
+		}
+		creation_in_progress = false;
+		return value;
+	}
+};
+
+template<typename> void TypeId() {};
+using type_id_type = void(*)();
+
+class Injector {
+public:
+	template<typename T> void Register(T* val = 0) {
+		DCHECK(registered_creators_.find(TypeId<T>) == registered_creators_.end(),
+		       "Can not register already registered type");
+		auto creator = new LazyCreator<T>;
+		if (!val) {
+			creator->Register([this] { return this->ConstructIfPossible<T>(); });
+		} else {
+			creator->Register([val] { return val; });
+		}
+		registered_creators_.emplace(TypeId<T>, creator);
+	}
+
+	template<typename I, typename T> void RegisterInterface(T* val = 0) {
+	DCHECK(registered_creators_.find(TypeId<I>) == registered_creators_.end(),
+		   "Can not register already registered type");
+		auto creator = new LazyCreator<I>;
+		if (!val) {
+			creator->Register([this] { return static_cast<I*>(this->ConstructIfPossible<T>()); });
+		} else {
+			creator->Register([val] { return static_cast<I*>(val); });
+		}
+		registered_creators_.emplace(TypeId<I>, creator);
+	}
+
+	template<typename T> std::shared_ptr<T> Resolve() {
+		DCHECK(registered_creators_.find(TypeId<T>) != registered_creators_.end(),
+		       "Can not resolve unregistered type");
+		LazyCreator<T>* creator = static_cast<LazyCreator<T>*>(registered_creators_[TypeId<T>]);
+		return creator->Resolve();
+	}
+
+	template<typename T> T* ConstructIfPossible() {
+	AnyResolver<Injector> resolver(this);
+	if (std::is_constructible<T, DiMark&&, decltype(resolver)>{}) {
+		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver)>{},
 							 T,
 							 DiMark&&,
-							 decltype(AnyResolver())>::construct(DiMark{}, AnyResolver{});
-	} else if (std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver())>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver())>{},
+							 decltype(resolver)>::construct(DiMark{}, resolver);
+	} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver)>{}) {
+		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver)>{},
 							 T,
 							 DiMark&&,
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver())>::construct(DiMark{}, AnyResolver{}, AnyResolver{});
-	} else if (std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{},
-							 T,
-							 DiMark&&,
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver())>::construct(DiMark{}, AnyResolver{}, AnyResolver{}, AnyResolver{});
-	} else if (std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{},
-							 T,
-							 DiMark&&,
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver())>::construct(DiMark{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{});
-	} else if (std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{},
-							 T,
-							 DiMark&&,
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver())>::construct(DiMark{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{});
-	} else if (std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{},
-							 T,
-							 DiMark&&,
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver())>::construct(DiMark{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{});
-	} else if (std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{},
-							 T,
-							 DiMark&&,
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver())>::construct(DiMark{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{});
-	} else if (std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{},
-							 T,
-							 DiMark&&,
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver())>::construct(DiMark{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{});
-	} else if (std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{},
-							 T,
-							 DiMark&&,
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver())>::construct(DiMark{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{});
-	} else if (std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver()), decltype(AnyResolver())>{},
-							 T,
-							 DiMark&&,
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver()),
-							 decltype(AnyResolver())>::construct(DiMark{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{}, AnyResolver{});
-	} else if (std::is_constructible<T, DiMark&&>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&>{},
-							 T,
-							 DiMark&&>::construct(DiMark{});
+							 decltype(resolver),
+							 decltype(resolver)>::construct(DiMark{}, resolver, resolver);
 	} else {
 		DCHECK(false, "Could not find apropriate constructor");
 		return reinterpret_cast<T*>(0);
 	}
 }
+
+private:
+	std::unordered_map<type_id_type, void*> registered_creators_;
+};
 
 }
 
