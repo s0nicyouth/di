@@ -1,6 +1,7 @@
 #include <stdexcept>
 #include <utility>
 #include <type_traits>
+#include <functional>
 
 #include "debug/debug.h"
 #include "inject_markers.h"
@@ -23,35 +24,45 @@ template<typename T, typename... Ts> using IsConstructable = IsConstructable_<vo
 
 template<typename T>static T* ConstructIfPossible();
 
-template<typename T> struct ValueHolder {
-	using type = T;
-	static T* value;
-	static CreationState creation_state;
+template<typename I> struct LazyCreator {
+	static I* value;
+	static std::function<I*()> function;
+	static void Register(std::function<I*()> f) {
+		function = f;
+	}
+	static I* Resolve() {
+		if (!value) {
+			value = function();
+		}
+		return value;
+	}
 };
-template<typename T> T* ValueHolder<T>::value = reinterpret_cast<T*>(0);
-template<typename T>CreationState ValueHolder<T>::creation_state = CreationState::NOT_REGISTERED;
+template<typename I> I* LazyCreator<I>::value = reinterpret_cast<I*>(0);
+template<typename I> std::function<I*()> LazyCreator<I>::function = []() -> I* {
+	DCHECK(false, "Trying to resolve unregistered type");
+	return LazyCreator<I>::value;
+};
 
 template<typename T> void Register(T* val = 0) {
-	ValueHolder<T>::value = val;
 	if (!val) {
-		ValueHolder<T>::creation_state = CreationState::REGISTERED;
+		LazyCreator<T>::Register([]() -> T* { return ConstructIfPossible<T>(); });
 	} else {
-		ValueHolder<T>::creation_state = CreationState::CONSTRUCTED;
+		LazyCreator<T>::Register([val]() -> T* { return val; });
+	}
+}
+
+
+template<typename I, typename T> void RegisterInterface(T* val = 0) {
+	if (!val) {
+		LazyCreator<I>::Register([]() -> I* { return static_cast<I*>(ConstructIfPossible<T>()); });
+	} else {
+		LazyCreator<I>::Register([val] () -> I* { return static_cast<I*>(val); });
 	}
 }
 
 template<typename T> T* Resolve() {
 	std::cout << "Type is: " << typeid(T).name() << std::endl;
-	DCHECK(ValueHolder<T>::creation_state != CreationState::NOT_REGISTERED,
-		   "Not registered!");
-	if (ValueHolder<T>::creation_state == CreationState::REGISTERED) {
-		std::cout << "Creating" << std::endl;
-		ValueHolder<T>::value = ConstructIfPossible<typename ValueHolder<T>::type>();
-		ValueHolder<T>::creation_state = CreationState::CONSTRUCTED;
-	} else {
-		std::cout << "Already created" << std::endl;
-	}
-	return ValueHolder<T>::value;
+	return LazyCreator<T>::Resolve();
 }
 
 struct AnyResolver {
