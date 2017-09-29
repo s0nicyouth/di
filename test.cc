@@ -10,7 +10,7 @@ public:
 
 class test_dependant {
 public:
-	INJECT(test_dependant, std::shared_ptr<test_class> t) {}
+	INJECT(test_dependant, std::shared_ptr<test_class> t, int a) { std::cout << "Created dependant. a = " << a << std::endl;}
 	void test() {std::cout << "Called dependant" << std::endl;}
 };
 

@@ -23,6 +23,18 @@ template<typename C> struct AnyResolver {
 	template<typename T> operator std::shared_ptr<T>() {
 		return injector_->template Resolve<T>();
 	}
+
+	template<typename T> operator T() {
+		return injector_->template ResolveValue<T>();
+	}
+
+	template<typename T> operator T*() {
+		static_assert(!std::is_pointer<T*>{}, "Resoling by raw pointer is forbidden");
+	}
+
+	template<typename T> operator const T*() {
+		static_assert(!std::is_pointer<const T*>{}, "Resoling by raw pointer is forbidden");
+	}
 };
 
 template<bool E, typename T, typename... Args> struct DiConstructor {
@@ -52,6 +64,16 @@ template<typename I> struct LazyCreator {
 		}
 		creation_in_progress = false;
 		return value;
+	}
+
+	I ResolveValue() {
+		DCHECK(!creation_in_progress, "Loop detected!");
+		creation_in_progress = true;
+		if (!value.get()) {
+			value.reset(creator());
+		}
+		creation_in_progress = false;
+		return *value;	
 	}
 };
 
@@ -91,83 +113,90 @@ public:
 		return creator->Resolve();
 	}
 
-	template<typename T> T* ConstructIfPossible() {
-	AnyResolver<Injector> resolver(this);
-	if (std::is_constructible<T, DiMark&&, decltype(resolver)>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver)>{},
-							 T,
-							 DiMark&&,
-							 decltype(resolver)>::construct(DiMark{}, resolver);
-	} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver)>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver)>{},
-							 T,
-							 DiMark&&,
-							 decltype(resolver),
-							 decltype(resolver)>::construct(DiMark{}, resolver, resolver);
-	} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver)>{},
-							 T,
-							 DiMark&&,
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver);
-	} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
-							 T,
-							 DiMark&&,
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver);
-	} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
-							 T,
-							 DiMark&&,
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver, resolver);
-	} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
-							 T,
-							 DiMark&&,
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver, resolver, resolver);
-	} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
-							 T,
-							 DiMark&&,
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver, resolver, resolver, resolver);
-	} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
-		return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
-							 T,
-							 DiMark&&,
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver),
-							 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver, resolver, resolver, resolver, resolver);
-	} else {
-		DCHECK(false, "Can not find appropriate constructor");
-		return reinterpret_cast<T*>(0);
+	template<typename T> T ResolveValue() {
+		DCHECK(registered_creators_.find(TypeId<T>) != registered_creators_.end(),
+		       "Can not resolve unregistered type");
+		LazyCreator<T>* creator = static_cast<LazyCreator<T>*>(registered_creators_[TypeId<T>]);
+		return creator->ResolveValue();
 	}
-}
 
 private:
+	template<typename T> T* ConstructIfPossible() {
+		AnyResolver<Injector> resolver(this);
+		if (std::is_constructible<T, DiMark&&, decltype(resolver)>{}) {
+			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver)>{},
+								 T,
+								 DiMark&&,
+								 decltype(resolver)>::construct(DiMark{}, resolver);
+		} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver)>{}) {
+			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver)>{},
+								 T,
+								 DiMark&&,
+								 decltype(resolver),
+								 decltype(resolver)>::construct(DiMark{}, resolver, resolver);
+		} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
+			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver)>{},
+								 T,
+								 DiMark&&,
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver);
+		} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
+			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
+								 T,
+								 DiMark&&,
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver);
+		} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
+			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
+								 T,
+								 DiMark&&,
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver, resolver);
+		} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
+			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
+								 T,
+								 DiMark&&,
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver, resolver, resolver);
+		} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
+			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
+								 T,
+								 DiMark&&,
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver, resolver, resolver, resolver);
+		} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
+			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
+								 T,
+								 DiMark&&,
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver),
+								 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver, resolver, resolver, resolver, resolver);
+		} else {
+			DCHECK(false, "Can not find appropriate constructor");
+			return reinterpret_cast<T*>(0);
+		}
+	}
+
 	std::unordered_map<type_id_type, void*> registered_creators_;
 };
 
