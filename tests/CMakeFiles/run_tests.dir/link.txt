@@ -1,0 +1,1 @@
+/usr/bin/c++     CMakeFiles/run_tests.dir/main.cc.o CMakeFiles/run_tests.dir/di_tests.cpp.o CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.o  -o bin/run_tests  -L/home/anton/own/di++/tests/../third_party/gtest/libs -Wl,-rpath,/home/anton/own/di++/tests/../third_party/gtest/libs -Wl,-Bstatic -lgtest -lgtest_main -Wl,-Bdynamic -pthread 
