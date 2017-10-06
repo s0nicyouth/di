@@ -94,7 +94,7 @@ template<typename T, typename... Args> struct DiConstructor<true, T, Args...> {
 };
 
 template<typename I> struct LazyCreator {
-	bool creation_in_progress;
+	bool creation_in_progress = false;
 	std::shared_ptr<I> value;
 	std::function<I*()> creator;
 	void Register(std::function<I*()> f) {
@@ -117,7 +117,7 @@ template<typename I> struct LazyCreator {
 			value.reset(creator());
 		}
 		creation_in_progress = false;
-		return *value;	
+		return *value;
 	}
 };
 
