@@ -3,6 +3,7 @@
 #include <functional>
 #include <unordered_map>
 #include <memory>
+#include <tuple>
 
 #include "di_debug/debug.h"
 
@@ -15,11 +16,54 @@ namespace di {
 #define INJECT(name, ...) explicit name(di::DiMark&& m, __VA_ARGS__)
 #define INJECT_EMPTY(name) explicit name(di::DiMark&& m)
 
+namespace {
+constexpr size_t MAX_SIZE = 3;
+constexpr size_t NO_CTOR = MAX_SIZE + 1;
+}
+
+
+struct DiMark;
+template<size_t> struct AnyType;
+template<typename T, size_t N, size_t Sz = 0, size_t... S> struct CtorSz;
+
+template<size_t, class T>
+using T_ = T;
+
+template<class T, size_t... Is>
+auto gen(std::index_sequence<Is...>) { return std::tuple<T_<Is, T>...>{}; }
+
+template<class T, size_t N>
+auto gen() { return gen<T>(std::make_index_sequence<N>{}); }
+
+template<typename, typename T, typename... Args> struct is_cons : public std::is_constructible<T, Args...> {};
+
+
+template<bool, typename T, size_t N, size_t Sz, size_t... S> struct CtorSize : public CtorSz<T, N, S...> {};
+template<typename T, size_t N, size_t Sz, size_t... S> struct CtorSize<true, T, N, Sz, S...> { static constexpr size_t sz = N;};
+
+template<typename T, size_t N, size_t Sz, size_t... S> struct CtorSz : CtorSize<std::is_constructible<T,
+																									  DiMark&&, 
+																									  decltype(AnyType<S>{})...>{}, 
+																				T, 
+																				N-1, 
+																				Sz, 
+																				S...> {};
+template<typename T> struct CtorSz<T, 0, 0> { static constexpr size_t sz = NO_CTOR; };
+
+
+template<typename T, size_t... S> constexpr size_t GetConstructorSize(std::index_sequence<S...>) noexcept {																		
+	return CtorSz<T, sizeof...(S), S...>::sz;
+}
+
 struct DiMark{};
 
-template<typename C> struct AnyResolver {
+template<size_t> struct AnyType {
+	template<typename T> operator T();
+};
+
+template<typename C, size_t... Dummy> struct AnyResolver {
 	C* injector_;
-	AnyResolver(C* injector) : injector_(injector) {}
+	constexpr AnyResolver(C* injector) : injector_(injector) {}
 	template<typename T> operator std::shared_ptr<T>() {
 		return injector_->template Resolve<T>();
 	}
@@ -38,7 +82,7 @@ template<typename C> struct AnyResolver {
 };
 
 template<bool E, typename T, typename... Args> struct DiConstructor {
-	static T* construct(Args... args) {
+	template<typename... FakeArgs> static T* construct(FakeArgs... args) {
 		return reinterpret_cast<T*>(0);
 	}
 };
@@ -121,80 +165,24 @@ public:
 	}
 
 private:
-	template<typename T> T* ConstructIfPossible() {
+	template<size_t... S> constexpr auto CreateTupleOfResolversOfSize(std::index_sequence<S...>) {
+		return std::tuple<AnyResolver<Injector, S>...>(AnyResolver<Injector, S>(this)...);
+	}
+
+	template<typename T, typename Tuple, size_t... TupleSize> constexpr T* ConstructType(const Tuple& t, std::index_sequence<TupleSize...>) {
+		return DiConstructor<std::is_constructible<T,
+												   DiMark&&, 
+												   decltype(AnyType<TupleSize>{})...>{},
+							 T,
+							 DiMark&&,
+							 decltype(AnyResolver<Injector, TupleSize>(this))...>::construct(std::move(DiMark{}), std::get<TupleSize>(t)...);
+	}
+
+	template<typename T> constexpr T* ConstructIfPossible() {
 		AnyResolver<Injector> resolver(this);
-		if (std::is_constructible<T, DiMark&&, decltype(resolver)>{}) {
-			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver)>{},
-								 T,
-								 DiMark&&,
-								 decltype(resolver)>::construct(DiMark{}, resolver);
-		} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver)>{}) {
-			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver)>{},
-								 T,
-								 DiMark&&,
-								 decltype(resolver),
-								 decltype(resolver)>::construct(DiMark{}, resolver, resolver);
-		} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
-			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver)>{},
-								 T,
-								 DiMark&&,
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver);
-		} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
-			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
-								 T,
-								 DiMark&&,
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver);
-		} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
-			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
-								 T,
-								 DiMark&&,
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver, resolver);
-		} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
-			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
-								 T,
-								 DiMark&&,
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver, resolver, resolver);
-		} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
-			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
-								 T,
-								 DiMark&&,
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver, resolver, resolver, resolver);
-		} else if (std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{}) {
-			return DiConstructor<std::is_constructible<T, DiMark&&, decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver), decltype(resolver)>{},
-								 T,
-								 DiMark&&,
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver),
-								 decltype(resolver)>::construct(DiMark{}, resolver, resolver, resolver, resolver, resolver, resolver, resolver, resolver);
-		} else {
-			DCHECK(false, "Can not find appropriate constructor");
-			return reinterpret_cast<T*>(0);
-		}
+		constexpr size_t ctor_size = GetConstructorSize<T>(std::make_index_sequence<MAX_SIZE>{});
+		auto tuple = CreateTupleOfResolversOfSize(std::make_index_sequence<ctor_size>{});
+		return ConstructType<T>(tuple, std::make_index_sequence<ctor_size>{});	
 	}
 
 	std::unordered_map<type_id_type, void*> registered_creators_;

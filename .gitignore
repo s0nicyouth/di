@@ -1,2 +1,9 @@
 *.out
 test.cc
+*a.out
+tests/.idea
+tests/CMakeFiles
+tests/bin
+tests/CMakeCache.txt
+tests/cmake_install.cmake
+tests/Simple_Di_Tests.cbr

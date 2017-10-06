@@ -63,15 +63,15 @@ include CMakeFiles/run_tests.dir/flags.make
 CMakeFiles/run_tests.dir/main.cc.o: CMakeFiles/run_tests.dir/flags.make
 CMakeFiles/run_tests.dir/main.cc.o: main.cc
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/anton/own/di++/tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/run_tests.dir/main.cc.o"
-	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/run_tests.dir/main.cc.o -c /home/anton/own/di++/tests/main.cc
+	/usr/bin/clang++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/run_tests.dir/main.cc.o -c /home/anton/own/di++/tests/main.cc
 
 CMakeFiles/run_tests.dir/main.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/run_tests.dir/main.cc.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/anton/own/di++/tests/main.cc > CMakeFiles/run_tests.dir/main.cc.i
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/anton/own/di++/tests/main.cc > CMakeFiles/run_tests.dir/main.cc.i
 
 CMakeFiles/run_tests.dir/main.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/run_tests.dir/main.cc.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/anton/own/di++/tests/main.cc -o CMakeFiles/run_tests.dir/main.cc.s
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/anton/own/di++/tests/main.cc -o CMakeFiles/run_tests.dir/main.cc.s
 
 CMakeFiles/run_tests.dir/main.cc.o.requires:
 
@@ -87,15 +87,15 @@ CMakeFiles/run_tests.dir/main.cc.o.provides.build: CMakeFiles/run_tests.dir/main
 CMakeFiles/run_tests.dir/di_tests.cpp.o: CMakeFiles/run_tests.dir/flags.make
 CMakeFiles/run_tests.dir/di_tests.cpp.o: di_tests.cpp
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/anton/own/di++/tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/run_tests.dir/di_tests.cpp.o"
-	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/run_tests.dir/di_tests.cpp.o -c /home/anton/own/di++/tests/di_tests.cpp
+	/usr/bin/clang++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/run_tests.dir/di_tests.cpp.o -c /home/anton/own/di++/tests/di_tests.cpp
 
 CMakeFiles/run_tests.dir/di_tests.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/run_tests.dir/di_tests.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/anton/own/di++/tests/di_tests.cpp > CMakeFiles/run_tests.dir/di_tests.cpp.i
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/anton/own/di++/tests/di_tests.cpp > CMakeFiles/run_tests.dir/di_tests.cpp.i
 
 CMakeFiles/run_tests.dir/di_tests.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/run_tests.dir/di_tests.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/anton/own/di++/tests/di_tests.cpp -o CMakeFiles/run_tests.dir/di_tests.cpp.s
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/anton/own/di++/tests/di_tests.cpp -o CMakeFiles/run_tests.dir/di_tests.cpp.s
 
 CMakeFiles/run_tests.dir/di_tests.cpp.o.requires:
 
@@ -111,15 +111,15 @@ CMakeFiles/run_tests.dir/di_tests.cpp.o.provides.build: CMakeFiles/run_tests.dir
 CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.o: CMakeFiles/run_tests.dir/flags.make
 CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.o: /home/anton/own/di++/src/di_debug/debug.cc
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/anton/own/di++/tests/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.o"
-	/usr/bin/c++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.o -c /home/anton/own/di++/src/di_debug/debug.cc
+	/usr/bin/clang++  $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -o CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.o -c /home/anton/own/di++/src/di_debug/debug.cc
 
 CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/anton/own/di++/src/di_debug/debug.cc > CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.i
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/anton/own/di++/src/di_debug/debug.cc > CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.i
 
 CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/anton/own/di++/src/di_debug/debug.cc -o CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.s
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/anton/own/di++/src/di_debug/debug.cc -o CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.s
 
 CMakeFiles/run_tests.dir/home/anton/own/di++/src/di_debug/debug.cc.o.requires:
 

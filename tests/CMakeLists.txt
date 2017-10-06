@@ -1,6 +1,9 @@
 cmake_minimum_required (VERSION 3.7.2)
 project (Simple_DI_Tests)
 
+set(CMAKE_C_COMPILER /usr/bin/clang)
+set(CMAKE_CXX_COMPILER /usr/bin/clang++)
+
 set(CMAKE_VERBOSE_MAKEFILE TRUE)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
