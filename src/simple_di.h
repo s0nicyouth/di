@@ -98,15 +98,23 @@ template<typename I> struct LazyCreator {
 	bool creation_in_progress = false;
 	std::shared_ptr<I> value;
 	std::function<I*()> creator;
+	std::function<std::shared_ptr<I>()> creator_shared;
 	void Register(std::function<I*()> f) {
 		creator = f;
+	}
+	void Register(std::function<std::shared_ptr<I>()> f) {
+		creator_shared = f;
 	}
 	std::shared_ptr<I> Resolve() {
 		DCHECK(!creation_in_progress, "Loop detected!");
 		creation_in_progress = true;
 		if (!value.get()) {
-			value.reset(creator());
-		}
+			if (creator) {
+				value.reset(creator());
+			} else {
+				value = creator_shared();
+			}
+		}	
 		creation_in_progress = false;
 		return value;
 	}
@@ -115,7 +123,11 @@ template<typename I> struct LazyCreator {
 		DCHECK(!creation_in_progress, "Loop detected!");
 		creation_in_progress = true;
 		if (!value.get()) {
-			value.reset(creator());
+			if (creator) {
+				value.reset(creator());
+			} else {
+				value = creator_shared();
+			}
 		}
 		creation_in_progress = false;
 		return *value;
@@ -140,6 +152,15 @@ public:
 		registered_creators_.emplace(TypeId<T>, creator);
 	}
 
+	template<typename T> void RegisterShared(std::shared_ptr<T> val) {
+		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
+		DCHECK(registered_creators_.find(TypeId<T>) == registered_creators_.end(),
+		       "Can not register already registered type");
+		auto creator = new LazyCreator<T>;
+		creator->Register([val] { return val; });
+		registered_creators_.emplace(TypeId<T>, creator);
+	}
+
 	template<typename I, typename T> void RegisterInterface(T* val = 0) {
 		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<I>) == registered_creators_.end(),
@@ -150,6 +171,15 @@ public:
 		} else {
 			creator->Register([val] { return static_cast<I*>(val); });
 		}
+		registered_creators_.emplace(TypeId<I>, creator);
+	}
+
+	template<typename I, typename T> void RegisterSharedInterface(std::shared_ptr<T> val) {
+		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
+		DCHECK(registered_creators_.find(TypeId<I>) == registered_creators_.end(),
+		   	   "Can not register already registered type");
+		auto creator = new LazyCreator<I>;
+		creator->Register([val] { return static_cast<std::shared_ptr<I> >(val); });
 		registered_creators_.emplace(TypeId<I>, creator);
 	}
 

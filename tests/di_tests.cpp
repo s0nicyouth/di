@@ -29,6 +29,17 @@ public:
     INJECT_EMPTY(test_class_with_0_arg) {};
 };
 
+class test_shared_class {
+};
+
+class test_resolve_shared {
+public:
+    int a;
+    INJECT(test_resolve_shared, int a, std::shared_ptr<test_shared_class> p) {
+        this->a = 1682;
+    }
+};
+
 class test {
 public:
     INJECT(test, int a) : a_(a) {}
@@ -116,25 +127,17 @@ TEST(DI_TESTS, TEST_AUTO_RESOLVE) {
     }
 }
 
-void resolver(const di::Injector& i) {
-    ASSERT_EQ(101, *i.Resolve<int>());
-}
-
-void registrator(di::Injector& i) {
-    auto * i_var = new int(101);
-    i.Register(i_var);
-}
-
-TEST(DI_TESTS, TEST_CONCURENT) {
-    constexpr int num_tries = 1000;
-    for (int i = 0; i < num_tries; i++) {
-        std::cout << "Multithreading test pass: " << i << std::endl;
-        di::Injector test_injector;
-        std::thread t2(registrator, std::ref(test_injector));
-        std::thread t1(resolver, std::ref(test_injector));
-
-        t1.join();
-        t2.join();
-    }
+TEST(DI_TESTS, TEST_REGISTER_SHARED) {
+    constexpr int test_int = 911;
+    std::shared_ptr<int> p(new int(test_int));
+    di::Injector test_injector;
+    test_shared_class* tsc = new test_shared_class;
+    std::shared_ptr<test_shared_class> tsc_s(tsc);
+    test_injector.RegisterShared(p);
+    test_injector.RegisterShared(tsc_s);
+    test_injector.Register<test_resolve_shared>();
+    ASSERT_EQ(test_int, test_injector.ResolveValue<int>());
+    ASSERT_EQ(tsc, test_injector.Resolve<test_shared_class>().get());
+    ASSERT_EQ(1682, test_injector.Resolve<test_resolve_shared>()->a);
 }
 
