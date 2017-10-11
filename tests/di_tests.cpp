@@ -3,6 +3,8 @@
 //
 
 #include <string>
+#include <mutex>
+#include <thread>
 
 #include "gtest/gtest.h"
 #include "simple_di.h"
@@ -111,6 +113,28 @@ TEST(DI_TESTS, TEST_AUTO_RESOLVE) {
         auto d = test_injector.Resolve<dependant>();
         auto a_d = test_injector.Resolve<another_dependant>();
         ASSERT_EQ(test_int, a_d->test_int());
+    }
+}
+
+void resolver(const di::Injector& i) {
+    ASSERT_EQ(101, *i.Resolve<int>());
+}
+
+void registrator(di::Injector& i) {
+    auto * i_var = new int(101);
+    i.Register(i_var);
+}
+
+TEST(DI_TESTS, TEST_CONCURENT) {
+    constexpr int num_tries = 1000;
+    for (int i = 0; i < num_tries; i++) {
+        std::cout << "Multithreading test pass: " << i << std::endl;
+        di::Injector test_injector;
+        std::thread t2(registrator, std::ref(test_injector));
+        std::thread t1(resolver, std::ref(test_injector));
+
+        t1.join();
+        t2.join();
     }
 }
 

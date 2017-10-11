@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <memory>
 #include <tuple>
+#include <mutex>
 
 #include "di_debug/debug.h"
 
@@ -127,6 +128,7 @@ using type_id_type = void(*)();
 class Injector {
 public:
 	template<typename T> void Register(T* val = 0) {
+		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<T>) == registered_creators_.end(),
 		       "Can not register already registered type");
 		auto creator = new LazyCreator<T>;
@@ -139,6 +141,7 @@ public:
 	}
 
 	template<typename I, typename T> void RegisterInterface(T* val = 0) {
+		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<I>) == registered_creators_.end(),
 		   	   "Can not register already registered type");
 		auto creator = new LazyCreator<I>;
@@ -150,17 +153,19 @@ public:
 		registered_creators_.emplace(TypeId<I>, creator);
 	}
 
-	template<typename T> std::shared_ptr<T> Resolve() {
+	template<typename T> std::shared_ptr<T> Resolve() const {
+		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<T>) != registered_creators_.end(),
 		       "Can not resolve unregistered type");
-		LazyCreator<T>* creator = static_cast<LazyCreator<T>*>(registered_creators_[TypeId<T>]);
+		LazyCreator<T>* creator = static_cast<LazyCreator<T>*>(registered_creators_.at(TypeId<T>));
 		return creator->Resolve();
 	}
 
-	template<typename T> T ResolveValue() {
+	template<typename T> T ResolveValue() const {
+		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<T>) != registered_creators_.end(),
 		       "Can not resolve unregistered type");
-		LazyCreator<T>* creator = static_cast<LazyCreator<T>*>(registered_creators_[TypeId<T>]);
+		LazyCreator<T>* creator = static_cast<LazyCreator<T>*>(registered_creators_.at(TypeId<T>));
 		return creator->ResolveValue();
 	}
 
@@ -186,6 +191,7 @@ private:
 	}
 
 	std::unordered_map<type_id_type, void*> registered_creators_;
+	mutable std::recursive_mutex di_mutex_;
 };
 
 }
