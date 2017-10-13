@@ -59,7 +59,7 @@ template<typename C, size_t... Dummy> struct AnyResolver {
 	C* injector_;
 	constexpr AnyResolver(C* injector) : injector_(injector) {}
 	template<typename T> operator std::shared_ptr<T>() {
-		return injector_->template Resolve<T>();
+		return injector_->template resolve<T>();
 	}
 
 	template<typename T> operator LazyPtr<T>() {
@@ -67,7 +67,7 @@ template<typename C, size_t... Dummy> struct AnyResolver {
 	}
 
 	template<typename T> operator T() {
-		return injector_->template ResolveValue<T>();
+		return injector_->template resolveValue<T>();
 	}
 
 	template<typename T> operator T*() {
@@ -136,7 +136,7 @@ using type_id_type = void(*)();
 
 class Injector {
 public:
-	template<typename T> void Register(T* val = 0) {
+	template<typename T> void registrate(T* val = 0) {
 		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<T>) == registered_creators_.end(),
 		       "Can not register already registered type");
@@ -149,7 +149,7 @@ public:
 		registered_creators_.emplace(TypeId<T>, creator);
 	}
 
-	template<typename T> void RegisterShared(std::shared_ptr<T> val) {
+	template<typename T> void registrateShared(std::shared_ptr<T> val) {
 		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<T>) == registered_creators_.end(),
 		       "Can not register already registered type");
@@ -158,7 +158,7 @@ public:
 		registered_creators_.emplace(TypeId<T>, creator);
 	}
 
-	template<typename I, typename T> void RegisterInterface(T* val = 0) {
+	template<typename I, typename T> void registrateInterface(T* val = 0) {
 		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<I>) == registered_creators_.end(),
 		   	   "Can not register already registered type");
@@ -171,7 +171,7 @@ public:
 		registered_creators_.emplace(TypeId<I>, creator);
 	}
 
-	template<typename I, typename T> void RegisterSharedInterface(std::shared_ptr<T> val) {
+	template<typename I, typename T> void registrateSharedInterface(std::shared_ptr<T> val) {
 		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<I>) == registered_creators_.end(),
 		   	   "Can not register already registered type");
@@ -180,7 +180,7 @@ public:
 		registered_creators_.emplace(TypeId<I>, creator);
 	}
 
-	template<typename T> std::shared_ptr<T> Resolve() const {
+	template<typename T> std::shared_ptr<T> resolve() const {
 		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<T>) != registered_creators_.end(),
 		       "Can not resolve unregistered type");
@@ -188,7 +188,7 @@ public:
 		return creator->Resolve();
 	}
 
-	template<typename T> T ResolveValue() const {
+	template<typename T> T resolveValue() const {
 		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<T>) != registered_creators_.end(),
 		       "Can not resolve unregistered type");
@@ -235,7 +235,7 @@ public:
 
 	LazyPtr(Injector* i) : injector_(i) {}
 	std::shared_ptr<T> get() {
-		return injector_->Resolve<T>();
+		return injector_->resolve<T>();
 	}
 
 private:
