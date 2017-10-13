@@ -35,8 +35,10 @@ class test_shared_class {
 class test_resolve_shared {
 public:
     int a;
+    std::shared_ptr<test_shared_class> t;
     INJECT(test_resolve_shared, int a, std::shared_ptr<test_shared_class> p) {
         this->a = 1682;
+        t = p;
     }
 };
 
@@ -127,6 +129,15 @@ TEST(DI_TESTS, TEST_AUTO_RESOLVE) {
     }
 }
 
+TEST(DI_TESTS, TEST_MULTIPLERESOLVES_RETURN_SAME) {
+    constexpr int test_int = 911;
+    di::Injector test_injector;
+    test_injector.Register<int>(new int(test_int));
+    test_injector.Register<test>();
+    test_injector.Register<dependant>();
+    ASSERT_EQ(test_injector.Resolve<dependant>().get(), test_injector.Resolve<dependant>().get());
+}
+
 TEST(DI_TESTS, TEST_REGISTER_SHARED) {
     constexpr int test_int = 911;
     std::shared_ptr<int> p(new int(test_int));
@@ -139,5 +150,27 @@ TEST(DI_TESTS, TEST_REGISTER_SHARED) {
     ASSERT_EQ(test_int, test_injector.ResolveValue<int>());
     ASSERT_EQ(tsc, test_injector.Resolve<test_shared_class>().get());
     ASSERT_EQ(1682, test_injector.Resolve<test_resolve_shared>()->a);
+    ASSERT_EQ(tsc, test_injector.Resolve<test_resolve_shared>()->t.get());
+}
+
+class test_lazy {
+public:
+    INJECT(test_lazy, di::LazyPtr<dependant> d) : d_(std::move(d)) {}
+
+    di::LazyPtr<dependant> d_;
+};
+
+TEST(DI_TESTS, TEST_LAZY) {
+    constexpr int test_int = 911;
+    di::Injector test_injector;
+    test_injector.Register<int>(new int(test_int));
+    test_injector.Register<test>();
+    test_injector.Register<dependant>();
+    test_injector.Register<test_lazy>();
+
+    std::shared_ptr<test_lazy> l = test_injector.Resolve<test_lazy>();
+    ASSERT_EQ(l->d_.get().get(), test_injector.Resolve<dependant>().get());
+    ASSERT_EQ(test_injector.Resolve<dependant>().get(), l->d_.get().get());
+    ASSERT_EQ(l->d_.get()->a_, test_int);
 }
 

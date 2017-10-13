@@ -26,18 +26,11 @@ constexpr size_t NO_CTOR = MAX_SIZE + 1;
 struct DiMark;
 template<size_t> struct AnyType;
 template<typename T, size_t N, size_t Sz = 0, size_t... S> struct CtorSz;
+class Injector;
+template<typename T> class LazyPtr;
 
 template<size_t, class T>
 using T_ = T;
-
-template<class T, size_t... Is>
-auto gen(std::index_sequence<Is...>) { return std::tuple<T_<Is, T>...>{}; }
-
-template<class T, size_t N>
-auto gen() { return gen<T>(std::make_index_sequence<N>{}); }
-
-template<typename, typename T, typename... Args> struct is_cons : public std::is_constructible<T, Args...> {};
-
 
 template<bool, typename T, size_t N, size_t Sz, size_t... S> struct CtorSize : public CtorSz<T, N, S...> {};
 template<typename T, size_t N, size_t Sz, size_t... S> struct CtorSize<true, T, N, Sz, S...> { static constexpr size_t sz = N;};
@@ -67,6 +60,10 @@ template<typename C, size_t... Dummy> struct AnyResolver {
 	constexpr AnyResolver(C* injector) : injector_(injector) {}
 	template<typename T> operator std::shared_ptr<T>() {
 		return injector_->template Resolve<T>();
+	}
+
+	template<typename T> operator LazyPtr<T>() {
+		return std::move(LazyPtr<T>(injector_));
 	}
 
 	template<typename T> operator T() {
@@ -222,6 +219,27 @@ private:
 
 	std::unordered_map<type_id_type, void*> registered_creators_;
 	mutable std::recursive_mutex di_mutex_;
+};
+
+template<typename T> class LazyPtr {
+public:
+	LazyPtr() = delete;
+	template<typename A> LazyPtr(const LazyPtr<A>&) = delete;
+	template<typename A> LazyPtr(LazyPtr<A>&) = delete;
+	LazyPtr(const LazyPtr<T>&) = delete;
+	LazyPtr(LazyPtr<T>&) = delete;
+
+	LazyPtr(LazyPtr<T>&& a) {
+		injector_ = a.injector_;
+	}
+
+	LazyPtr(Injector* i) : injector_(i) {}
+	std::shared_ptr<T> get() {
+		return injector_->Resolve<T>();
+	}
+
+private:
+	Injector* injector_;
 };
 
 }
