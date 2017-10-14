@@ -18,7 +18,7 @@ namespace di {
 #define INJECT_EMPTY(name) explicit name(di::DiMark&& m)
 
 namespace {
-constexpr size_t MAX_SIZE = 3;
+constexpr size_t MAX_SIZE = 50;
 constexpr size_t NO_CTOR = MAX_SIZE + 1;
 }
 
