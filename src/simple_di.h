@@ -91,7 +91,12 @@ template<typename T, typename... Args> struct DiConstructor<true, T, Args...> {
 	}
 };
 
-template<typename I> struct LazyCreator {
+class LazyCreatorBase {
+public:
+	virtual ~LazyCreatorBase() {}
+};
+
+template<typename I> struct LazyCreator : public LazyCreatorBase {
 	bool creation_in_progress = false;
 	std::shared_ptr<I> value;
 	std::function<I*()> creator;
@@ -184,7 +189,7 @@ public:
 		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<T>) != registered_creators_.end(),
 		       "Can not resolve unregistered type");
-		LazyCreator<T>* creator = static_cast<LazyCreator<T>*>(registered_creators_.at(TypeId<T>));
+		LazyCreator<T>* creator = static_cast<LazyCreator<T>*>(registered_creators_.at(TypeId<T>).get());
 		return creator->Resolve();
 	}
 
@@ -192,7 +197,7 @@ public:
 		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<T>) != registered_creators_.end(),
 		       "Can not resolve unregistered type");
-		LazyCreator<T>* creator = static_cast<LazyCreator<T>*>(registered_creators_.at(TypeId<T>));
+		LazyCreator<T>* creator = static_cast<LazyCreator<T>*>(registered_creators_.at(TypeId<T>).get());
 		return creator->ResolveValue();
 	}
 
@@ -217,7 +222,7 @@ private:
 		return ConstructType<T>(tuple, std::make_index_sequence<ctor_size>{});	
 	}
 
-	std::unordered_map<type_id_type, void*> registered_creators_;
+	std::unordered_map<type_id_type, std::unique_ptr<LazyCreatorBase> > registered_creators_;
 	mutable std::recursive_mutex di_mutex_;
 };
 

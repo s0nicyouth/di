@@ -71,12 +71,12 @@ TEST(DI_TESTS, POD_TYPES) {
     long long_val = 123;
     short short_val = 123;
     char char_val = 'a';
-    test_injector.registrate<int>(&int_val);
-    test_injector.registrate<float>(&float_val);
-    test_injector.registrate<double>(&double_val);
-    test_injector.registrate<long>(&long_val);
-    test_injector.registrate<short>(&short_val);
-    test_injector.registrate<char>(&char_val);
+    test_injector.registrate<int>(new int(int_val));
+    test_injector.registrate<float>(new float(float_val));
+    test_injector.registrate<double>(new double(double_val));
+    test_injector.registrate<long>(new long(long_val));
+    test_injector.registrate<short>(new short(short_val));
+    test_injector.registrate<char>(new char(char_val));
     ASSERT_EQ(test_injector.resolveValue<int>(), int_val);
     ASSERT_EQ(test_injector.resolveValue<float>(), float_val);
     ASSERT_EQ(test_injector.resolveValue<double>(), double_val);
@@ -88,21 +88,21 @@ TEST(DI_TESTS, POD_TYPES) {
 TEST(DI_TESTS, COMPLEX_TYPES) {
     di::Injector test_injector;
     std::string test_str("test");
-    test_injector.registrate<std::string>(&test_str);
+    test_injector.registrate<std::string>(new std::string(test_str));
     ASSERT_EQ(*test_injector.resolve<std::string>(), test_str);
 }
 
 TEST(DI_TESTS, BY_VALUE) {
     di::Injector test_injector;
     std::string test_str("test");
-    test_injector.registrate<std::string>(&test_str);
+    test_injector.registrate<std::string>(new std::string(test_str));
     ASSERT_EQ(test_injector.resolveValue<std::string>(), test_str);
 }
 
 TEST(DI_TESTS, BY_SHARED) {
     di::Injector test_injector;
     std::string test_str("test");
-    test_injector.registrate<std::string>(&test_str);
+    test_injector.registrate<std::string>(new std::string(test_str));
     ASSERT_EQ(*test_injector.resolve<std::string>(), test_str);
 }
 
