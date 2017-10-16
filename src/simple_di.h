@@ -99,37 +99,26 @@ public:
 template<typename I> struct LazyCreator : public LazyCreatorBase {
 	bool creation_in_progress = false;
 	std::shared_ptr<I> value;
-	std::function<I*()> creator;
 	std::function<std::shared_ptr<I>()> creator_shared;
-	void Register(std::function<I*()> f) {
-		creator = f;
-	}
-	void Register(std::function<std::shared_ptr<I>()> f) {
+	void Register(std::function<std::shared_ptr<I> ()> f) {
 		creator_shared = f;
 	}
 	std::shared_ptr<I> Resolve() {
 		DCHECK(!creation_in_progress, "Loop detected!");
 		creation_in_progress = true;
 		if (!value.get()) {
-			if (creator) {
-				value.reset(creator());
-			} else {
-				value = creator_shared();
-			}
+			value = creator_shared();
 		}	
 		creation_in_progress = false;
 		return value;
 	}
 
-	I ResolveValue() {
+    template <typename U = I>
+    std::enable_if_t<!std::is_abstract<U>{}, U> ResolveValue() {
 		DCHECK(!creation_in_progress, "Loop detected!");
 		creation_in_progress = true;
 		if (!value.get()) {
-			if (creator) {
-				value.reset(creator());
-			} else {
-				value = creator_shared();
-			}
+			value = creator_shared();
 		}
 		creation_in_progress = false;
 		return *value;
@@ -141,7 +130,7 @@ using type_id_type = void(*)();
 
 class Injector {
 public:
-	template<typename T> void registrate(T* val = 0) {
+	template<typename T> void registrate(std::unique_ptr<T> val = nullptr) {
 		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<T>) == registered_creators_.end(),
 		       "Can not register already registered type");
@@ -149,7 +138,7 @@ public:
 		if (!val) {
 			creator->Register([this] { return this->ConstructIfPossible<T>(); });
 		} else {
-			creator->Register([val] { return val; });
+			creator->Register([val = std::shared_ptr<T>(val.release())] () mutable -> std::shared_ptr<T> { return val; });
 		}
 		registered_creators_.emplace(TypeId<T>, creator);
 	}
@@ -163,20 +152,24 @@ public:
 		registered_creators_.emplace(TypeId<T>, creator);
 	}
 
-	template<typename I, typename T> void registrateInterface(T* val = 0) {
+	template<typename I, typename T> void registrateInterface(std::unique_ptr<T> val = nullptr) {
+		static_assert(!std::is_same<I, T>{}, "Interface and implementation classes can not be same");
+		static_assert(std::is_base_of<I, T>{}, "Interface should be a base class of implementation");
 		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<I>) == registered_creators_.end(),
 		   	   "Can not register already registered type");
 		auto creator = new LazyCreator<I>;
 		if (!val) {
-			creator->Register([this] { return static_cast<I*>(this->ConstructIfPossible<T>()); });
+			creator->Register([this] { return static_cast<std::shared_ptr<I> >(this->ConstructIfPossible<T>()); });
 		} else {
-			creator->Register([val] { return static_cast<I*>(val); });
+			creator->Register([val = std::shared_ptr<I>(val.release())] () mutable -> std::shared_ptr<I> { return val; });
 		}
 		registered_creators_.emplace(TypeId<I>, creator);
 	}
 
 	template<typename I, typename T> void registrateSharedInterface(std::shared_ptr<T> val) {
+		static_assert(!std::is_same<I, T>{}, "Interface and implementation classes can not be same");
+		static_assert(std::is_base_of<I, T>{}, "Interface should be a base class of implementation");
 		std::lock_guard<std::recursive_mutex> guard(di_mutex_);
 		DCHECK(registered_creators_.find(TypeId<I>) == registered_creators_.end(),
 		   	   "Can not register already registered type");
@@ -215,11 +208,11 @@ private:
 							 decltype(AnyResolver<Injector, TupleSize>(this))...>::construct(std::move(DiMark{}), std::get<TupleSize>(t)...);
 	}
 
-	template<typename T> constexpr T* ConstructIfPossible() {
+	template<typename T> constexpr std::shared_ptr<T> ConstructIfPossible() {
 		AnyResolver<Injector> resolver(this);
 		constexpr size_t ctor_size = GetConstructorSize<T>(std::make_index_sequence<MAX_SIZE>{});
 		auto tuple = CreateTupleOfResolversOfSize(std::make_index_sequence<ctor_size>{});
-		return ConstructType<T>(tuple, std::make_index_sequence<ctor_size>{});	
+		return std::shared_ptr<T>(ConstructType<T>(tuple, std::make_index_sequence<ctor_size>{}));
 	}
 
 	std::unordered_map<type_id_type, std::unique_ptr<LazyCreatorBase> > registered_creators_;

@@ -71,12 +71,12 @@ TEST(DI_TESTS, POD_TYPES) {
     long long_val = 123;
     short short_val = 123;
     char char_val = 'a';
-    test_injector.registrate<int>(new int(int_val));
-    test_injector.registrate<float>(new float(float_val));
-    test_injector.registrate<double>(new double(double_val));
-    test_injector.registrate<long>(new long(long_val));
-    test_injector.registrate<short>(new short(short_val));
-    test_injector.registrate<char>(new char(char_val));
+    test_injector.registrate<int>(std::make_unique<int>(int_val));
+    test_injector.registrate<float>(std::make_unique<float>(float_val));
+    test_injector.registrate<double>(std::make_unique<double>(double_val));
+    test_injector.registrate<long>(std::make_unique<long>(long_val));
+    test_injector.registrate<short>(std::make_unique<short>(short_val));
+    test_injector.registrate<char>(std::make_unique<char>(char_val));
     ASSERT_EQ(test_injector.resolveValue<int>(), int_val);
     ASSERT_EQ(test_injector.resolveValue<float>(), float_val);
     ASSERT_EQ(test_injector.resolveValue<double>(), double_val);
@@ -88,21 +88,21 @@ TEST(DI_TESTS, POD_TYPES) {
 TEST(DI_TESTS, COMPLEX_TYPES) {
     di::Injector test_injector;
     std::string test_str("test");
-    test_injector.registrate<std::string>(new std::string(test_str));
+    test_injector.registrate<std::string>(std::make_unique<std::string>(test_str));
     ASSERT_EQ(*test_injector.resolve<std::string>(), test_str);
 }
 
 TEST(DI_TESTS, BY_VALUE) {
     di::Injector test_injector;
     std::string test_str("test");
-    test_injector.registrate<std::string>(new std::string(test_str));
+    test_injector.registrate<std::string>(std::make_unique<std::string>(test_str));
     ASSERT_EQ(test_injector.resolveValue<std::string>(), test_str);
 }
 
 TEST(DI_TESTS, BY_SHARED) {
     di::Injector test_injector;
     std::string test_str("test");
-    test_injector.registrate<std::string>(new std::string(test_str));
+    test_injector.registrate<std::string>(std::make_unique<std::string>(test_str));
     ASSERT_EQ(*test_injector.resolve<std::string>(), test_str);
 }
 
@@ -110,7 +110,7 @@ TEST(DI_TESTS, TEST_AUTO_RESOLVE) {
     constexpr int test_int = 911;
     {
         di::Injector test_injector;
-        test_injector.registrate<int>(new int(test_int));
+        test_injector.registrate<int>(std::make_unique<int>(test_int));
         test_injector.registrate<test>();
         test_injector.registrate<dependant>();
         auto d = test_injector.resolve<dependant>();
@@ -119,7 +119,7 @@ TEST(DI_TESTS, TEST_AUTO_RESOLVE) {
     }
     {
         di::Injector test_injector;
-        test_injector.registrate<int>(new int(test_int));
+        test_injector.registrate<int>(std::make_unique<int>(test_int));
         test_injector.registrate<test>();
         test_injector.registrate<dependant>();
         test_injector.registrate<another_dependant>();
@@ -132,7 +132,7 @@ TEST(DI_TESTS, TEST_AUTO_RESOLVE) {
 TEST(DI_TESTS, TEST_MULTIPLERESOLVES_RETURN_SAME) {
     constexpr int test_int = 911;
     di::Injector test_injector;
-    test_injector.registrate<int>(new int(test_int));
+    test_injector.registrate<int>(std::make_unique<int>(test_int));
     test_injector.registrate<test>();
     test_injector.registrate<dependant>();
     ASSERT_EQ(test_injector.resolve<dependant>().get(), test_injector.resolve<dependant>().get());
@@ -140,7 +140,7 @@ TEST(DI_TESTS, TEST_MULTIPLERESOLVES_RETURN_SAME) {
 
 TEST(DI_TESTS, TEST_REGISTER_SHARED) {
     constexpr int test_int = 911;
-    std::shared_ptr<int> p(new int(test_int));
+    std::shared_ptr<int> p(std::make_unique<int>(test_int));
     di::Injector test_injector;
     test_shared_class* tsc = new test_shared_class;
     std::shared_ptr<test_shared_class> tsc_s(tsc);
@@ -163,7 +163,7 @@ public:
 TEST(DI_TESTS, TEST_LAZY) {
     constexpr int test_int = 911;
     di::Injector test_injector;
-    test_injector.registrate<int>(new int(test_int));
+    test_injector.registrate<int>(std::make_unique<int>(test_int));
     test_injector.registrate<test>();
     test_injector.registrate<dependant>();
     test_injector.registrate<test_lazy>();
@@ -172,5 +172,27 @@ TEST(DI_TESTS, TEST_LAZY) {
     ASSERT_EQ(l->d_.get().get(), test_injector.resolve<dependant>().get());
     ASSERT_EQ(test_injector.resolve<dependant>().get(), l->d_.get().get());
     ASSERT_EQ(l->d_.get()->a_, test_int);
+}
+
+class Interface {
+public:
+    ~Interface() {}
+
+    virtual int test() = 0;
+};
+
+class Impl : public Interface {
+    int a;
+public:
+    INJECT_EMPTY(Impl) { a = 512; };
+    int test() override {
+        return a;
+    }
+};
+
+TEST(DI_TESTS, TEST_ONLY_INTERFACE) {
+    di::Injector test_injector;
+    test_injector.registrateInterface<Interface, Impl>();
+    ASSERT_EQ(512, test_injector.resolve<Interface>()->test());
 }
 
